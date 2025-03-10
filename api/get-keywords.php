@@ -80,7 +80,7 @@ $keywords = [
     
     // Duygular
     "mutluluk", "üzüntü", "korku", "öfke", "şaşkınlık", "heyecan", "merak", "endişe",
-    "gurur", "utanç", "sevgi", "nefret", "kıskançlık", "umut", "hayal kırıklığı", "minnettarlık",
+    "gurur", "utanç", "sevgi", "nefret", "kıskançlık", "umut", "hayal", "kırıklığı", "minnettarlık",
     
     // Teknoloji terimleri
     "internet", "bilgisayar", "yazılım", "donanım", "uygulama", "dosya", "site", "şifre",

@@ -5,14 +5,14 @@ header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
 // Dosya yolu sorununu çözmek için farklı olası yolları deneyelim
-$scoresFile = __DIR__ . '/sample-scores.json';
+$scoresFile = __DIR__ . '/scores.json';
 
 // Dosya mevcut değilse diğer olası yolları dene
 if (!file_exists($scoresFile)) {
-    $scoresFile = dirname(__DIR__) . '/api/sample-scores.json';
+    $scoresFile = dirname(__DIR__) . '/api/scores.json';
     
     if (!file_exists($scoresFile)) {
-        $scoresFile = dirname(__DIR__) . '/sample-scores.json';
+        $scoresFile = dirname(__DIR__) . '/scores.json';
     }
 }
 
@@ -20,9 +20,9 @@ if (!file_exists($scoresFile)) {
 if (!file_exists($scoresFile)) {
     echo json_encode([
         'error' => 'Skor dosyası bulunamadı. Aranan yollar: ' . 
-                   __DIR__ . '/sample-scores.json, ' . 
-                   dirname(__DIR__) . '/api/sample-scores.json, ' . 
-                   dirname(__DIR__) . '/sample-scores.json'
+                   __DIR__ . '/scores.json, ' . 
+                   dirname(__DIR__) . '/api/scores.json, ' . 
+                   dirname(__DIR__) . '/scores.json'
     ]);
     exit;
 }
@@ -63,69 +63,83 @@ if (isset($_GET['username'])) {
 
 // Kullanıcı adına göre sıralama
 function getUserRankings($scores, $username) {
-    // JSON yapısını kontrol et - muhtemelen 'scores' anahtarı altında düz bir liste var
-    $scoresList = [];
+    // Farklı zaman dilimleri için skorları filtrele
+    $hourlyScores = filterScoresByTimeframe($scores, 'hourly');
+    $dailyScores = filterScoresByTimeframe($scores, 'daily');
+    $weeklyScores = filterScoresByTimeframe($scores, 'weekly');
     
-    // Gerçek JSON yapısına göre veriyi hazırla
-    if (isset($scores['scores'])) {
-        $scoresList = $scores['scores'];
-    } elseif (is_array($scores)) {
-        $scoresList = $scores;
-    } else {
-        return ['error' => 'Geçersiz skor verisi yapısı', 'data' => $scores];
-    }
+    // Kullanıcının her zaman dilimindeki sıralamasını bul
+    $hourlyRank = findRank($hourlyScores, $username);
+    $dailyRank = findRank($dailyScores, $username);
+    $weeklyRank = findRank($weeklyScores, $username);
     
-    // Puanları azalan sırada sırala
-    usort($scoresList, function($a, $b) {
-        return $b['score'] - $a['score'];
-    });
-    
-    // Kullanıcının sıralamasını bul
-    $rank = findRank($scoresList, $username);
-    
-    // Tüm zaman dilimleri için aynı sıralamayı kullan
     return [
         'success' => true,
-        'daily' => $rank,
-        'weekly' => $rank,
-        'monthly' => $rank
+        'hourly' => $hourlyRank, // Saatlik sıralamayı ekledik
+        'daily' => $dailyRank,
+        'weekly' => $weeklyRank
     ];
 }
 
 // Skora göre sıralama
 function getScoreRanking($scores, $score) {
-    // JSON yapısını kontrol et - muhtemelen 'scores' anahtarı altında düz bir liste var
-    $scoresList = [];
+    // Farklı zaman dilimleri için skorları filtrele
+    $hourlyScores = filterScoresByTimeframe($scores, 'hourly');
+    $dailyScores = filterScoresByTimeframe($scores, 'daily');
+    $weeklyScores = filterScoresByTimeframe($scores, 'weekly');
     
-    // Gerçek JSON yapısına göre veriyi hazırla
+    // Skorun her zaman dilimindeki sıralamasını bul
+    $hourlyRank = findScoreRank($hourlyScores, $score);
+    $dailyRank = findScoreRank($dailyScores, $score);
+    $weeklyRank = findScoreRank($weeklyScores, $score);
+    
+    return [
+        'success' => true,
+        'hourly' => $hourlyRank, // Saatlik sıralamayı ekledik
+        'daily' => $dailyRank,
+        'weekly' => $weeklyRank
+    ];
+}
+
+// Belirli bir zaman dilimine göre skorları filtrele
+function filterScoresByTimeframe($scores, $timeframe) {
+    $now = time();
+    $filteredScores = [];
+    
+    // JSON yapısını kontrol et
+    $scoresList = [];
     if (isset($scores['scores'])) {
         $scoresList = $scores['scores'];
     } elseif (is_array($scores)) {
         $scoresList = $scores;
     } else {
-        return ['error' => 'Geçersiz skor verisi yapısı', 'data' => $scores];
+        return [];
     }
     
-    // Puanları azalan sırada sırala
-    usort($scoresList, function($a, $b) {
+    foreach ($scoresList as $score) {
+        $timestamp = isset($score['timestamp']) ? intval($score['timestamp']) / 1000 : 0;
+        
+        // Zaman dilimlerine göre filtrele
+        if ($timeframe === 'hourly' && $now - $timestamp <= 3600) {
+            $filteredScores[] = $score;
+        } elseif ($timeframe === 'daily' && $now - $timestamp <= 86400) {
+            $filteredScores[] = $score;
+        } elseif ($timeframe === 'weekly' && $now - $timestamp <= 604800) {
+            $filteredScores[] = $score;
+        }
+    }
+    
+    // Skorlara göre sırala
+    usort($filteredScores, function($a, $b) {
         return $b['score'] - $a['score'];
     });
     
-    // Belirli skorun sıralamasını bul
-    $rank = findScoreRank($scoresList, $score);
-    
-    // Tüm zaman dilimleri için aynı sıralamayı kullan
-    return [
-        'success' => true,
-        'daily' => $rank,
-        'weekly' => $rank,
-        'monthly' => $rank
-    ];
+    return $filteredScores;
 }
 
 // Kullanıcının sıralamasını bul
 function findRank($scoreList, $username) {
-    if (!is_array($scoreList)) {
+    if (!is_array($scoreList) || empty($scoreList)) {
         return null;
     }
     
@@ -139,7 +153,7 @@ function findRank($scoreList, $username) {
 
 // Skora göre sıralama bul
 function findScoreRank($scoreList, $score) {
-    if (!is_array($scoreList)) {
+    if (!is_array($scoreList) || empty($scoreList)) {
         return 1;
     }
     

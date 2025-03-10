@@ -236,6 +236,9 @@ function fetchUserRankings(usernameOrScore, isScore = false) {
     // API endpoint'i ve parametreleri belirle
     let apiUrl = `/api/get-user-rankings.php?score=${encodeURIComponent(usernameOrScore)}`;
     
+    // API'ye zaman parametresi ekleyerek önbellek sorunlarını önle
+    apiUrl += `&_t=${Date.now()}`;
+    
     // Sunucudan sıralama bilgilerini al
     fetch(apiUrl)
         .then(response => response.json())
@@ -243,38 +246,30 @@ function fetchUserRankings(usernameOrScore, isScore = false) {
             const rankingContainer = document.getElementById('user-rankings');
             if (!rankingContainer) return;
             
+            // API yanıtını konsola yazdırarak hata ayıklama
+            console.log("API Yanıtı:", data);
+            
             if (data.success) {
                 // Sıralama bilgilerini göster
                 let rankingText = '';
                 
-                if (data.daily) {
-                    rankingText += `Günlük: ${data.daily}. sıra`;
-                } else {
-                    rankingText += 'Günlük: -';
-                }
+                // API yanıtının yapısını kontrol et
+                // Eğer hourly özelliği yoksa, monthly özelliğini kullan (geriye dönük uyumluluk için)
+                const hourlyRank = data.hourly !== undefined ? data.hourly : (data.monthly !== undefined ? data.monthly : '-');
+                const dailyRank = data.daily !== undefined ? data.daily : '-';
+                const weeklyRank = data.weekly !== undefined ? data.weekly : '-';
                 
-                rankingText += ' | ';
-                
-                if (data.weekly) {
-                    rankingText += `Haftalık: ${data.weekly}. sıra`;
-                } else {
-                    rankingText += 'Haftalık: -';
-                }
-                
-                rankingText += ' | ';
-                
-                if (data.monthly) {
-                    rankingText += `Aylık: ${data.monthly}. sıra`;
-                } else {
-                    rankingText += 'Aylık: -';
-                }
+                rankingText = `Saatlik: ${hourlyRank}${typeof hourlyRank === 'number' ? '. sıra' : ''} | `;
+                rankingText += `Günlük: ${dailyRank}${typeof dailyRank === 'number' ? '. sıra' : ''} | `;
+                rankingText += `Haftalık: ${weeklyRank}${typeof weeklyRank === 'number' ? '. sıra' : ''}`;
                 
                 rankingContainer.textContent = rankingText;
             } else {
-                rankingContainer.textContent = 'Sıralama bilgileri alınamadı.';
+                rankingContainer.textContent = 'Sıralama bilgileri alınamadı: ' + (data.message || 'Bilinmeyen hata');
             }
         })
         .catch(error => {
+            console.error("Sıralama bilgisi hatası:", error);
             const rankingContainer = document.getElementById('user-rankings');
             if (rankingContainer) {
                 rankingContainer.textContent = 'Sıralama bilgileri yüklenirken hata oluştu.';
@@ -397,7 +392,7 @@ function calculateScore(correctWords, totalKeystrokes, accuracy) {
 // Oyunu başlat
 function startGame() {
     // Değişkenleri sıfırla
-    timeLeft = 60;
+    timeLeft = 10;
     correctWords = 0;
     incorrectWords = 0;
     totalKeystrokes = 0;
@@ -447,6 +442,7 @@ function endGame() {
     // Puanı ve seviyeyi hesapla
     const result = calculateScore(correctWords, totalKeystrokes, accuracy);
     
+    // Önce DOM güncellemelerini yap
     // Sonuçları güncelle
     document.getElementById('final-score').textContent = result.score;
     document.getElementById('correct-words').textContent = correctWords;
@@ -455,18 +451,11 @@ function endGame() {
     document.getElementById('total-keystrokes').textContent = totalKeystrokes;
     document.getElementById('skill-level').textContent = result.skillLevel;
     
-    // Kullanıcı adı değil, anlık skora göre sıralama bilgilerini getir
-    fetchUserRankings(result.score, true);
-    
     // Yanlış yazılan kelimeleri göster
     displayIncorrectWords();
     
     // Tuş hata istatistiklerini göster
     displayKeyErrorStats();
-    
-    // Kullanıcı adı yerine skor bilgisini API'ye gönder
-    const currentScore = result.score;
-    const username = currentUsername;
     
     // Kullanıcı adı varsa, skor kaydetme bölümünü gizle
     const saveScoreSection = document.querySelector('.save-score-section');
@@ -476,62 +465,163 @@ function endGame() {
         saveScoreSection.style.display = 'block';
     }
     
-    // Sonuç ekranını göster
+    // Ekranları güncelle
     gameScreen.style.display = 'none';
     resultScreen.style.display = 'block';
     document.getElementById('scoreboard-container').style.display = 'block';
     
-    // Skor tablosunu göster ve skorları yükle
-    loadAllScores();
+    // Aktif tabı hourly olarak ayarla
+    activeTabId = 'hourly';
     
-    // Tekrar oyna düğmesini taşı
-    setTimeout(moveRestartButton, 100);
+    // Tüm tabları inaktif yap
+    const allTabs = document.querySelectorAll('.tab-button');
+    allTabs.forEach(tab => tab.classList.remove('active'));
+    
+    // Hourly tabı aktif yap
+    const hourlyTab = document.getElementById('hourly-tab');
+    if (hourlyTab) hourlyTab.classList.add('active');
+    
+    // Direkt kontrol kodları
+    console.log("Skorlar yükleniyor...");
+    
+    // Skor tablosunu güncelle
+    loadScores('last1Hour').then(() => {
+        // Kullanıcı sıralama bilgilerini güncelle
+        fetchUserRankings(result.score, true);
+        // Tekrar oyna düğmesini taşı
+        moveRestartButton();
+    });
 }
 
-// Tüm skorbordları bir kerede yükle
-function loadAllScores() {
-    // Yükleniyor mesajı göster
-    document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Skorlar yükleniyor...</td></tr>';
+// Tablo kontrol ve doldurma fonksiyonu (tek bir güvenilir fonksiyon)
+function fillScoreTable(tableBodyId, scores, includeExtraColumns = false) {
+    console.log(`Tabloya ${scores.length} skor yerleştiriliyor: ${tableBodyId}`);
     
-    // Tüm skorları tek seferde al
-    fetch('/api/get-scores.php')
+    const tbody = document.getElementById(tableBodyId);
+    if (!tbody) {
+        console.error(`Tablo bulunamadı: ${tableBodyId}`);
+        return false;
+    }
+    
+    // Tabloyu temizle
+    tbody.innerHTML = '';
+    
+    // Skorlar boşsa mesaj göster
+    if (!scores || scores.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${includeExtraColumns ? 6 : 4}" style="text-align:center;">Bu zaman aralığında skor bulunamadı</td></tr>`;
+        return true;
+    }
+    
+    // Skorları tabloya ekle
+    scores.forEach((score, index) => {
+        const tr = document.createElement('tr');
+        
+        // Temel sütunlar
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${score.username || 'İsimsiz'}</td>
+            <td>${score.score}</td>
+        `;
+        
+        // Eğer genişletilmiş tablo ise ekstra sütunları da ekle
+        if (includeExtraColumns) {
+            tr.innerHTML += `
+                <td>${score.wordCount || 'N/A'}</td>
+                <td>${score.keystrokeCount || 'N/A'}</td>
+            `;
+        }
+        
+        // Tarih sütunu
+        tr.innerHTML += `<td>${new Date(score.timestamp).toLocaleString('tr-TR')}</td>`;
+        
+        tbody.appendChild(tr);
+    });
+    
+    return true;
+}
+
+// Skorları yükleyip tüm tabloları güncelleme fonksiyonu
+function loadScores(timeFrame = 'last1Hour') {
+    console.log(`Skorlar yükleniyor: ${timeFrame}`);
+    
+    // UI formatını API formatına dönüştür
+    const timeFrameMap = {
+        'hourly': 'last1Hour',
+        'daily': 'last1Day',
+        'weekly': 'last1Week'
+    };
+    
+    // Eğer UI formatı geldiyse, API formatına dönüştür
+    const apiTimeFrame = timeFrameMap[timeFrame] || timeFrame;
+    
+    return fetch('/api/get-scores.php')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Veriyi ön bellekte sakla
-                window.cachedScores = {
-                    hourly: data.last1Hour || [],
-                    daily: data.last1Day || [],
-                    weekly: data.last1Week || []
-                };
-                
-                // Aktif sekmeye göre skorları göster
-                renderScoreboard(getCachedScores(activeTabId));
-            } else {
-                document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Skorlar yüklenemedi: ' + (data.message || 'Bilinmeyen hata') + '</td></tr>';
+            console.log("API yanıtı:", data);
+            
+            if (!data.success) {
+                console.error("API hatası:", data.message);
+                return false;
             }
+            
+            // Cache'i güncelle
+            window.cachedScores = {
+                hourly: data.last1Hour || [],
+                daily: data.last1Day || [],
+                weekly: data.last1Week || []
+            };
+            
+            // Doğru API formatını kullan
+            const scores = data[apiTimeFrame] || [];
+            console.log(`${apiTimeFrame} için ${scores.length} skor bulundu`);
+            
+            // Ana skorbord tablosunu güncelle 
+            fillScoreTable('scoreboard-body', scores, true);
+            
+            // Sonuç tablosunu güncelle (eğer varsa)
+            const resultTable = document.querySelector('#scoreTable tbody');
+            if (resultTable && resultTable.id === 'scoreTable-body') {
+                fillScoreTable('scoreTable-body', scores, false);
+            } else if (resultTable) {
+                // ID farklıysa doğrudan DOM ile güncelle
+                resultTable.innerHTML = '';
+                
+                if (scores.length === 0) {
+                    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center;">Bu zaman aralığında skor bulunamadı</td></tr>';
+                } else {
+                    scores.forEach((score, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>${score.username || 'İsimsiz'}</td>
+                            <td>${score.score}</td>
+                            <td>${new Date(parseInt(score.timestamp)).toLocaleString('tr-TR')}</td>
+                        `;
+                        resultTable.appendChild(tr);
+                    });
+                }
+            }
+            
+            return true;
         })
         .catch(error => {
-            document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Sunucu hatası oluştu: ' + error + '</td></tr>';
+            console.error("Skor yükleme hatası:", error);
+            return false;
         });
 }
 
-// Önbellekten skorları al
-function getCachedScores(timeFrame) {
-    if (!window.cachedScores) {
-        return [];
-    }
+// Tab değiştirme fonksiyonunu basitleştir
+function changeTab(timeFrame, element) {
+    // Tüm tabları inaktif yap
+    const allTabs = document.querySelectorAll('.tab-button');
+    allTabs.forEach(tab => tab.classList.remove('active'));
     
-    switch(timeFrame) {
-        case 'hourly':
-            return window.cachedScores.hourly;
-        case 'daily':
-            return window.cachedScores.daily;
-        case 'weekly':
-            return window.cachedScores.weekly;
-        default:
-            return window.cachedScores.hourly;
-    }
+    // Tıklanan tabı aktif yap
+    element.classList.add('active');
+    activeTabId = timeFrame;
+    
+    // Direkt olarak loadScores'a UI formatını gönder
+    loadScores(timeFrame);
 }
 
 // Kelimeyi kontrol et
@@ -830,10 +920,10 @@ function saveUserScore() {
             const currentTab = document.querySelector('.tab-button.active');
             if (currentTab) {
                 const timeFrame = currentTab.id.replace('-tab', '');
-                fetchScoresFromServer(timeFrame);
+                loadScores(timeFrame);
             } else {
                 // Aktif tab bulunamazsa saatlik olarak göster
-                fetchScoresFromServer('hourly');
+                loadScores('hourly');
             }
             
             // Kullanıcı sıralama bilgilerini güncelle
@@ -850,102 +940,6 @@ function saveUserScore() {
         saveMessage.style.color = '#f5222d';
         saveMessage.style.display = 'block';
     });
-}
-
-// Skorları sunucudan alma fonksiyonu
-function fetchScoresFromServer(timeFrame) {
-    // api/ dizini olmadan tam URL kullan
-    fetch(`/api/get-scores.php?timeFrame=${timeFrame}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (data.scores && data.scores.length > 0) {
-                    renderScoreboard(data.scores);
-                } else {
-                    document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Bu zaman diliminde skor bulunamadı.</td></tr>';
-                }
-            } else {
-                document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Skorlar yüklenemedi: ' + data.message + '</td></tr>';
-            }
-        })
-        .catch(error => {
-            document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Sunucu hatası oluştu: ' + error + '</td></tr>';
-        });
-}
-
-// Skor tablosunu güncelleme fonksiyonu
-function renderScoreboard(scores) {
-    const tbody = document.getElementById('scoreboard-body');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    // Hiç skor yoksa mesaj göster
-    if (!scores || scores.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Henüz skor kaydedilmemiş.</td></tr>';
-        return;
-    }
-    
-    // Tabloyu oluştur
-    scores.forEach((score, index) => {
-        const row = document.createElement('tr');
-        
-        const rankCell = document.createElement('td');
-        rankCell.textContent = index + 1;
-        row.appendChild(rankCell);
-        
-        const userCell = document.createElement('td');
-        userCell.textContent = score.username;
-        row.appendChild(userCell);
-        
-        const scoreCell = document.createElement('td');
-        scoreCell.textContent = score.score;
-        row.appendChild(scoreCell);
-        
-        // Kelime sayısı hücresi
-        const wordCountCell = document.createElement('td');
-        wordCountCell.textContent = score.wordCount || 'N/A';
-        row.appendChild(wordCountCell);
-        
-        // Vuruş sayısı hücresi
-        const keystrokeCountCell = document.createElement('td');
-        keystrokeCountCell.textContent = score.keystrokeCount || 'N/A';
-        row.appendChild(keystrokeCountCell);
-        
-        const dateCell = document.createElement('td');
-        // 24 saat formatında tarih gösterimi
-        const date = new Date(score.timestamp);
-        dateCell.textContent = date.toLocaleString('tr-TR', { 
-            hour12: false, 
-            year: 'numeric', 
-            month: '2-digit', 
-            day: '2-digit',
-            hour: '2-digit', 
-            minute: '2-digit'
-        });
-        row.appendChild(dateCell);
-        
-        tbody.appendChild(row);
-    });
-}
-
-// Tab değiştirme fonksiyonu
-function changeTab(timeFrame, element) {
-    // Tüm tabları inaktif yap
-    const allTabs = document.querySelectorAll('.tab-button');
-    allTabs.forEach(tab => tab.classList.remove('active'));
-    
-    // Tıklanan tabı aktif yap
-    element.classList.add('active');
-    activeTabId = timeFrame;
-    
-    // Önbellekteki skorları kullan
-    if (window.cachedScores) {
-        renderScoreboard(getCachedScores(timeFrame));
-    } else {
-        // Eğer henüz yüklenmemişse yükle
-        loadAllScores();
-    }
 }
 
 // CSS stillerini ekle
@@ -1224,16 +1218,16 @@ document.addEventListener('DOMContentLoaded', function() {
         changeTab('weekly', this);
     });
     
-    // Başlangıçta saatlik skorbord'u göster
+    // Başlangıçta saatlik tabı aktif yap ve skorları yükle
     const hourlyTab = document.getElementById('hourly-tab');
-    changeTab('hourly', hourlyTab);
-    
-    // Sayfa yüklendiğinde de düğmeyi taşı (sayfa yenileme durumları için)
-    moveRestartButton();
-    
-    // "Tekrar Başla" butonunu "Tekrar Oyna" olarak değiştir
-    if (restartBtn) {
-        restartBtn.textContent = 'Tekrar Oyna';
+    if (hourlyTab) {
+        hourlyTab.classList.add('active');
+        activeTabId = 'hourly';
+        
+        // Başlangıç skorlarını yükle
+        setTimeout(() => {
+            loadScores('last1Hour');
+        }, 200);
     }
 });
 
@@ -1266,27 +1260,4 @@ function checkCurrentTyping(typedText, actualWord) {
         // Doğru yazım - normal göster
         currentWordElement.classList.remove('typing-error');
     }
-}
-
-function getScores() {
-    fetch('api/get-scores.php')
-    .then(response => response.json())
-    .then(scores => {
-        const scoreTable = document.getElementById('scoreTable');
-        const tbody = scoreTable.querySelector('tbody');
-        tbody.innerHTML = ''; // Mevcut skorları temizle
-        
-        scores.forEach((score, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${score.score}</td>
-                <td>${score.date}</td>
-            `;
-            tbody.appendChild(row);
-        });
-    })
-    .catch(error => {
-        console.error('Skorlar yüklenirken hata:', error);
-    });
 } 
