@@ -3,73 +3,115 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
 
-// Dosya yolunu belirle
-$filePath = __DIR__ . '/sample-scores.json';
+// Debug için hata gösterimini aç
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// Debug kodlarını kaldır
-// header('Content-Type: text/plain');
-// echo "Debug bilgileri..."
+// Geçerli zaman
+$currentTime = time();
 
-// Varsayılan yanıt yapısı
-$response = [
-    'success' => false,
-    'scores' => [],
-    'message' => 'Skorlar yüklenemedi'
-];
+// Zaman aralıklarını hesapla
+$hourlyStartTime = $currentTime - 3600;    // Son 1 saat
+$dailyStartTime = $currentTime - 86400;    // Son 24 saat
+$weeklyStartTime = $currentTime - 604800;  // Son 7 gün
 
-// GET parametresi olarak zaman dilimini al
-$timeFrame = isset($_GET['timeFrame']) ? $_GET['timeFrame'] : 'all';
+// Dosya yolunu kontrol et
+$scoresFile = __DIR__ . '/scores.json';
 
-// Mevcut skorları oku
-if (file_exists($filePath)) {
-    $jsonContent = file_get_contents($filePath);
-    $jsonData = json_decode($jsonContent, true);
+// Skorları veritabanından veya JSON dosyasından al
+$allScores = [];
+if (file_exists($scoresFile)) {
+    $scoresJson = file_get_contents($scoresFile);
+    $jsonData = json_decode($scoresJson, true) ?: [];
+    // scores anahtarının altındaki verileri al
+    $allScores = isset($jsonData['scores']) ? $jsonData['scores'] : [];
+}
+
+// Filtreli skorları saklamak için diziler
+$hourlyScores = [];
+$dailyScores = [];
+$weeklyScores = [];
+
+// Debug için timestamp dönüşüm fonksiyonu
+function normalizeTimestamp($timestamp) {
+    // String ise sayıya çevir
+    if (is_string($timestamp)) {
+        $timestamp = (int)$timestamp;
+    }
     
-    if ($jsonData !== null && isset($jsonData['scores'])) {
-        $scores = $jsonData['scores'];
-        
-        // Referans zaman
-        $referenceTime = 1693571000000; // En yeni veri zamanı
-            
-        // Zaman aralıkları
-        $HOUR_MS = 60 * 60 * 1000;
-        $DAY_MS = 24 * $HOUR_MS;
-        $WEEK_MS = 7 * $DAY_MS;
-        
-        // Zaman dilimine göre filtrele
-        if ($timeFrame !== 'all') {
-            $filteredScores = [];
-            
-            foreach ($scores as $score) {
-                $timeDiff = $referenceTime - $score['timestamp'];
-                
-                if ($timeFrame === 'hourly' && $timeDiff < $HOUR_MS) {
-                    $filteredScores[] = $score;
-                } else if ($timeFrame === 'daily' && $timeDiff < $DAY_MS) {
-                    $filteredScores[] = $score;
-                } else if ($timeFrame === 'weekly' && $timeDiff < $WEEK_MS) {
-                    $filteredScores[] = $score;
-                }
-            }
-            
-            $scores = $filteredScores;
-        }
-        
-        // Puana göre sırala
-        usort($scores, function($a, $b) {
-            return $b['score'] - $a['score'];
-        });
+    // Milisaniye ise saniyeye çevir (13 haneli)
+    if ($timestamp > 10000000000) {
+        $timestamp = floor($timestamp / 1000);
+    }
+    
+    return $timestamp;
+}
 
-        $response = [
-            'success' => true,
-            'scores' => $scores,
-            'message' => 'Skorlar başarıyla yüklendi'
-        ];
+// Skorları filtrele
+foreach ($allScores as $score) {
+    if (!isset($score['timestamp'])) {
+        continue; // timestamp yoksa atla
+    }
+    
+    // Timestamp'i normalize et
+    $timestamp = normalizeTimestamp($score['timestamp']);
+    
+    // Debug için orijinal ve dönüştürülmüş timestamp'i sakla
+    $score['_debug'] = [
+        'original_timestamp' => $score['timestamp'],
+        'normalized_timestamp' => $timestamp,
+        'current_time' => $currentTime,
+        'hourly_diff' => $timestamp - $hourlyStartTime,
+        'daily_diff' => $timestamp - $dailyStartTime,
+        'weekly_diff' => $timestamp - $weeklyStartTime
+    ];
+    
+    // Zaman filtrelemesi
+    if ($timestamp >= $weeklyStartTime) {
+        $weeklyScores[] = $score;
+        
+        if ($timestamp >= $dailyStartTime) {
+            $dailyScores[] = $score;
+            
+            if ($timestamp >= $hourlyStartTime) {
+                $hourlyScores[] = $score;
+            }
+        }
     }
 }
 
-// "exit" ifadesini kaldırın!
-// exit;
+// Skorları puana göre sırala
+function sortScores($a, $b) {
+    return $b['score'] - $a['score'];
+}
 
-echo json_encode($response);
+usort($hourlyScores, 'sortScores');
+usort($dailyScores, 'sortScores');
+usort($weeklyScores, 'sortScores');
+
+// Debug bilgileri
+$debug = [
+    'current_time' => $currentTime,
+    'time_ranges' => [
+        'hourly_start' => $hourlyStartTime,
+        'daily_start' => $dailyStartTime,
+        'weekly_start' => $weeklyStartTime
+    ],
+    'sample_scores' => array_slice($allScores, 0, 3), // İlk 3 skoru örnek olarak göster
+    'filtered_counts' => [
+        'total' => count($allScores),
+        'hourly' => count($hourlyScores),
+        'daily' => count($dailyScores),
+        'weekly' => count($weeklyScores)
+    ]
+];
+
+// Sonucu JSON olarak döndür
+echo json_encode([
+    'success' => true,
+    'last1Hour' => $hourlyScores,
+    'last1Day' => $dailyScores,
+    'last1Week' => $weeklyScores,
+    'debug' => $debug
+]);
 ?> 

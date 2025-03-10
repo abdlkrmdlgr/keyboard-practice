@@ -468,8 +468,57 @@ function endGame() {
     resultScreen.style.display = 'block';
     document.getElementById('scoreboard-container').style.display = 'block';
     
+    // Skor tablosunu göster ve skorları yükle
+    loadAllScores();
+    
     // Tekrar oyna düğmesini taşı
     setTimeout(moveRestartButton, 100);
+}
+
+// Tüm skorbordları bir kerede yükle
+function loadAllScores() {
+    // Yükleniyor mesajı göster
+    document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Skorlar yükleniyor...</td></tr>';
+    
+    // Tüm skorları tek seferde al
+    fetch('/api/get-scores.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Veriyi ön bellekte sakla
+                window.cachedScores = {
+                    hourly: data.last1Hour || [],
+                    daily: data.last1Day || [],
+                    weekly: data.last1Week || []
+                };
+                
+                // Aktif sekmeye göre skorları göster
+                renderScoreboard(getCachedScores(activeTabId));
+            } else {
+                document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Skorlar yüklenemedi: ' + (data.message || 'Bilinmeyen hata') + '</td></tr>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('scoreboard-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Sunucu hatası oluştu: ' + error + '</td></tr>';
+        });
+}
+
+// Önbellekten skorları al
+function getCachedScores(timeFrame) {
+    if (!window.cachedScores) {
+        return [];
+    }
+    
+    switch(timeFrame) {
+        case 'hourly':
+            return window.cachedScores.hourly;
+        case 'daily':
+            return window.cachedScores.daily;
+        case 'weekly':
+            return window.cachedScores.weekly;
+        default:
+            return window.cachedScores.hourly;
+    }
 }
 
 // Kelimeyi kontrol et
@@ -866,8 +915,13 @@ function changeTab(timeFrame, element) {
     element.classList.add('active');
     activeTabId = timeFrame;
     
-    // Sunucudan skorları getir ve göster
-    fetchScoresFromServer(timeFrame);
+    // Önbellekteki skorları kullan
+    if (window.cachedScores) {
+        renderScoreboard(getCachedScores(timeFrame));
+    } else {
+        // Eğer henüz yüklenmemişse yükle
+        loadAllScores();
+    }
 }
 
 // CSS stillerini ekle
