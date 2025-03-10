@@ -392,7 +392,7 @@ function calculateScore(correctWords, totalKeystrokes, accuracy) {
 // Oyunu başlat
 function startGame() {
     // Değişkenleri sıfırla
-    timeLeft = 10;
+    timeLeft = 60;
     correctWords = 0;
     incorrectWords = 0;
     totalKeystrokes = 0;
