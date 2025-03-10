@@ -14,6 +14,7 @@ let keyErrorStats = {};
 let currentUsername = '';
 let activeTabId = 'hourly';
 let turkishWords = [];
+let lastRefreshIndex = 0; // Son kelime yenileme indeksi - bunu ekledik
 
 // HTML elementlerini seçme
 const startScreen = document.getElementById('start-screen');
@@ -25,6 +26,10 @@ const timerElement = document.getElementById('timer');
 const wordDisplay = document.getElementById('word-display');
 const wordInput = document.getElementById('word-input');
 const restartBtn = document.getElementById('restart-btn');
+
+// Geri sayım öğesini taşıyacak kod
+const countdownElement = document.getElementById('countdown');
+const inputElement = document.getElementById('inputText');
 
 // Kullanıcı adını LocalStorage'dan alır
 function getUsername() {
@@ -108,7 +113,33 @@ function generateWords() {
 // Kelime görüntüsünü güncelle
 function updateWordDisplay() {
     wordDisplay.innerHTML = '';
-    words.forEach((word, index) => {
+    
+    // İndeks 19'a geldiğinde ilk 19 kelimeyi kaldır, 19 yeni kelime ekle
+    if (currentWordIndex >= 19) {
+        // İlk 19 kelimeyi kaldır, son 5 kelimeyi tut
+        words = words.slice(19);
+        wordResults = wordResults.slice(19);
+        
+        // Kelime indeksini güncelle (19 kelime çıkarıldığı için)
+        currentWordIndex -= 19;
+        
+        // Yeni kelimeler oluştur - 19 kelime ekle
+        const newWords = generateWords().slice(0, 19);
+        
+        // Kelimeleri listenin sonuna ekle
+        words = words.concat(newWords);
+        
+        // Yeni kelimeler için sonuç dizisini genişlet
+        wordResults = wordResults.concat(new Array(newWords.length).fill(null));
+    }
+    
+    // İlk 24 kelimeyi göster
+    const startIndex = 0;
+    const endIndex = Math.min(24, words.length);
+    const wordsToShow = words.slice(startIndex, endIndex);
+    
+    // Kelimeleri ekrana yerleştir
+    wordsToShow.forEach((word, index) => {
         const wordElement = document.createElement('span');
         wordElement.textContent = word;
         wordElement.classList.add('word');
@@ -128,11 +159,38 @@ function updateWordDisplay() {
     });
 }
 
+// Kelimeleri ekrana yerleştiren yardımcı fonksiyon
+function displayWords(wordsArray, startIndex) {
+    wordsArray.forEach((word, index) => {
+        const wordElement = document.createElement('span');
+        wordElement.textContent = word;
+        wordElement.classList.add('word');
+        
+        const actualIndex = startIndex + index;
+        
+        if (actualIndex === currentWordIndex) {
+            wordElement.classList.add('current');
+        } else if (actualIndex < currentWordIndex) {
+            // Önceki kelimelerin doğru/yanlış durumlarını kontrol et
+            if (wordResults[actualIndex] === false) {
+                wordElement.classList.add('incorrect');
+            } else {
+                wordElement.classList.add('correct');
+            }
+        }
+        
+        wordDisplay.appendChild(wordElement);
+    });
+}
+
 // Zamanı güncelle
 function updateTimer() {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
-    timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const timerElement = document.getElementById('timer');
+    if (timerElement) {
+        timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
     
     if (timeLeft === 0) {
         clearInterval(timer);
@@ -184,9 +242,6 @@ function fetchUserRankings(usernameOrScore, isScore = false) {
         .then(data => {
             const rankingContainer = document.getElementById('user-rankings');
             if (!rankingContainer) return;
-            
-            // Debug bilgilerini konsola yaz
-            console.log("Sıralama verileri:", data);
             
             if (data.success) {
                 // Sıralama bilgilerini göster
@@ -254,18 +309,68 @@ function moveRestartButton() {
     }
 }
 
-// API yüklemek için fonksiyonu güncelle
+// Türkçe kelimeleri yükleyen fonksiyonu kontrol et
 function loadTurkishWords() {
-    return fetch('/api/get-keywords.php')
-        .then(response => response.json())
-        .then(data => {
-            turkishWords = data;
-            console.log('Kelimeler yüklendi:', turkishWords.length);
-            return turkishWords;
-        })
-        .catch(error => {
-            console.error('Kelimeler yüklenirken hata oluştu:', error);
-        });
+    return new Promise((resolve) => {
+        // Eğer kelimeler zaten yüklendiyse, hemen tamamla
+        if (turkishWords.length > 0) {
+            resolve();
+            return;
+        }
+        
+        // Türkçe kelimeler yükleniyor...
+        
+        // Backend'den kelime getirme kodu
+        fetch('/api/get-keywords.php')
+            .then(response => {
+                return response.json();
+            })
+            .then(data => {
+                // API veri yapısı...
+                
+                // API yanıtı kontrol edilir
+                if (data) {
+                    // API yanıtında kelimeler doğrudan kök seviyede bir dizi olabilir
+                    if (Array.isArray(data)) {
+                        turkishWords = data;
+                    }
+                    // API yanıtı bir nesne ve içinde words veya keywords alanı olabilir
+                    else if (typeof data === 'object') {
+                        if (data.success && (data.words || data.keywords)) {
+                            turkishWords = data.words || data.keywords || [];
+                        } 
+                        // API yanıtında başka bir anahtar altında kelimeler olabilir
+                        else if (data.data || data.kelimeler || data.content) {
+                            turkishWords = data.data || data.kelimeler || data.content || [];
+                        }
+                        // API yanıtının anahtarlarını kontrol edelim
+                        else {
+                            const possibleArrays = Object.values(data).filter(val => Array.isArray(val));
+                            if (possibleArrays.length > 0) {
+                                // İlk dizi tipindeki değeri kullanalım
+                                turkishWords = possibleArrays[0];
+                            } else {
+                                console.error("API yanıtında kelime dizisi bulunamadı");
+                                turkishWords = ["merhaba", "dünya", "klavye", "bilgisayar", "yazılım"];
+                            }
+                        }
+                    } else {
+                        console.error("API yanıtı beklenmeyen bir formatta:", typeof data);
+                        turkishWords = ["merhaba", "dünya", "klavye", "bilgisayar", "yazılım"];
+                    }
+                } else {
+                    console.error("API yanıtı boş veya geçersiz");
+                    turkishWords = ["merhaba", "dünya", "klavye", "bilgisayar", "yazılım"];
+                }
+                
+                resolve();
+            })
+            .catch(error => {
+                console.error("Backend bağlantı hatası:", error);
+                turkishWords = ["merhaba", "dünya", "klavye", "bilgisayar", "yazılım"];
+                resolve();
+            });
+    });
 }
 
 // Oyunu başlat
@@ -280,6 +385,7 @@ function startGame() {
     wordResults = [];
     incorrectWordsList = [];
     keyErrorStats = {};
+    lastRefreshIndex = 0;
     
     // Oyun ekranını göster
     startScreen.style.display = 'none';
@@ -406,14 +512,7 @@ function checkWord() {
     // Sonraki kelimeye geç
     currentWordIndex++;
     
-    // Son 5 kelimeye yaklaştıysak veya kelimeler bittiyse yeni kelimeler getir
-    if (currentWordIndex >= words.length - 5) {
-        // Yeni kelimeler oluştur
-        words = words.concat(generateWords());
-        // Yeni kelimeler için sonuç dizisini genişlet
-        wordResults = wordResults.concat(new Array(words.length - wordResults.length));
-    }
-    
+    // Kelime gösterimini güncelle (burada kelimeler kontrol edilecek)
     updateWordDisplay();
     wordInput.value = '';
 }
@@ -995,18 +1094,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // WordInput için event listener ekleyin
+    wordInput.addEventListener('input', function() {
+        if (!isPlaying) return;
+        
+        // Anlık yazılan metni al
+        const typedText = this.value.trim();
+        
+        // Yazılan metin boşsa kontrol etme
+        if (typedText === '') return;
+        
+        // Şu anki kelimeyi bul
+        const currentWord = words[currentWordIndex];
+        
+        // Kelimeyi hemen kontrol et
+        checkCurrentTyping(typedText, currentWord);
+    });
+    
     // Başla butonuna tıklandığında oyunu başlat
     document.getElementById('start-btn').addEventListener('click', startGame);
     
-    // Bitir butonuna tıklandığında oyunu bitir ve kullanıcı adı varsa otomatik kaydet
-    document.getElementById('end-game-btn').addEventListener('click', function() {
-        endGame();
-        
-        // Kullanıcı adı varsa otomatik kaydet
-        if (currentUsername) {
-            setTimeout(saveUserScore, 500); // Sonuçlar oluştuktan sonra kaydet
-        }
-    });
+    // Oyunu Bitir düğmesi kontrolü - önce elementin var olup olmadığını kontrol et
+    const endGameBtn = document.getElementById('end-game-btn');
+    if (endGameBtn) {
+        endGameBtn.addEventListener('click', function() {
+            endGame();
+            
+            // Kullanıcı adı varsa otomatik kaydet
+            if (currentUsername) {
+                setTimeout(saveUserScore, 500); // Sonuçlar oluştuktan sonra kaydet
+            }
+        });
+    }
     
     // Yeniden başlat butonuna tıklandığında oyunu yeniden başlat
     document.getElementById('restart-btn').addEventListener('click', startGame);
@@ -1038,4 +1157,35 @@ document.addEventListener('DOMContentLoaded', function() {
     if (restartBtn) {
         restartBtn.textContent = 'Tekrar Oyna';
     }
-}); 
+});
+
+// Anlık yazım kontrolü
+function checkCurrentTyping(typedText, actualWord) {
+    // Mevcut kelime elementini bul
+    const wordElements = wordDisplay.querySelectorAll('.word');
+    const currentWordElement = wordElements[currentWordIndex];
+    
+    if (!currentWordElement) return;
+    
+    // Harf harf kontrol et
+    let isCorrect = true;
+    
+    // Şu ana kadar yazılan harfleri kontrol et
+    for (let i = 0; i < typedText.length; i++) {
+        // Eğer kelimeden daha uzun yazılmışsa veya harf yanlışsa
+        if (i >= actualWord.length || 
+            normalizeTurkishText(typedText[i]) !== normalizeTurkishText(actualWord[i])) {
+            isCorrect = false;
+            break;
+        }
+    }
+    
+    // Hataları göster
+    if (!isCorrect) {
+        // Yanlış yazım - kırmızı vurgula
+        currentWordElement.classList.add('typing-error');
+    } else {
+        // Doğru yazım - normal göster
+        currentWordElement.classList.remove('typing-error');
+    }
+} 

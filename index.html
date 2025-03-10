@@ -16,12 +16,13 @@
         </div>
         
         <div id="game-screen" style="display: none;">
-            <div id="timer" class="timer">01:00</div>
             <div id="word-display" class="word-display"></div>
             <div class="input-area">
-                <input type="text" id="word-input" placeholder="Kelimeyi yazın ve boşluk tuşuna basın" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <input type="text" id="word-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
-            <button id="end-game-btn" class="end-game-btn">Oyunu Bitir</button>
+            <div id="countdown">
+                <div id="timer" class="timer">01:00</div>
+            </div>
         </div>
         
         <div id="result" class="result">
