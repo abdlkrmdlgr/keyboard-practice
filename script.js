@@ -740,6 +740,18 @@ function saveUserScore() {
     let username = currentUsername;
     const saveMessage = document.getElementById('save-message');
     
+    // Score ve tuş vuruş sayısını al
+    const score = parseInt(document.getElementById('final-score').textContent) || 0;
+    const keystrokeCount = parseInt(document.getElementById('total-keystrokes').textContent) || 0;
+    
+    // Score ve tuş vuruş sayısı kontrolü
+    if (score <= 0 || keystrokeCount <= 0) {
+        saveMessage.textContent = 'Score ve tuş vuruş sayısı sıfırdan büyük olmalıdır!';
+        saveMessage.style.color = '#f5222d';
+        saveMessage.style.display = 'block';
+        return;
+    }
+
     // Eğer mevcut bir kullanıcı adı yoksa, input'tan al
     if (!username) {
         const usernameInput = document.getElementById('username-input');
@@ -764,9 +776,7 @@ function saveUserScore() {
     }
     
     // Kullanıcının son skorunu al
-    const score = parseInt(document.getElementById('final-score').textContent) || 0;
     const wordCount = parseInt(document.getElementById('correct-words').textContent) || 0;
-    const keystrokeCount = parseInt(document.getElementById('total-keystrokes').textContent) || 0;
     
     // Skoru kaydet
     const scoreData = {
