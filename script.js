@@ -397,7 +397,7 @@ function calculateScore(correctWords, totalKeystrokes, accuracy) {
 // Oyunu başlat
 function startGame() {
     // Değişkenleri sıfırla
-    timeLeft = 60;
+    timeLeft = 10;
     correctWords = 0;
     incorrectWords = 0;
     totalKeystrokes = 0;
@@ -1266,4 +1266,27 @@ function checkCurrentTyping(typedText, actualWord) {
         // Doğru yazım - normal göster
         currentWordElement.classList.remove('typing-error');
     }
+}
+
+function getScores() {
+    fetch('api/get-scores.php')
+    .then(response => response.json())
+    .then(scores => {
+        const scoreTable = document.getElementById('scoreTable');
+        const tbody = scoreTable.querySelector('tbody');
+        tbody.innerHTML = ''; // Mevcut skorları temizle
+        
+        scores.forEach((score, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${score.score}</td>
+                <td>${score.date}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    })
+    .catch(error => {
+        console.error('Skorlar yüklenirken hata:', error);
+    });
 } 

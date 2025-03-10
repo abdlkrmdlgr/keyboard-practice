@@ -90,7 +90,7 @@ if ($totalWords > 0) {
 // Tüm validasyonlar geçildiyse skoru kaydet
 try {
     // Dosya yolunu belirle
-    $filePath = __DIR__ . '/sample-scores.json';
+    $filePath = __DIR__ . '/scores.json';
 
     // Mevcut skorları oku
     if (file_exists($filePath)) {
@@ -113,12 +113,10 @@ try {
     $jsonData['scores'][] = $data;
 
     // Dosyaya yaz
-    $success = file_put_contents($filePath, json_encode($jsonData, JSON_PRETTY_PRINT));
-
-    if ($success) {
+    if (file_put_contents($filePath, json_encode($jsonData, JSON_PRETTY_PRINT))) {
         echo json_encode(['success' => true, 'message' => 'Skor başarıyla kaydedildi']);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Skor kaydedilirken bir hata oluştu']);
+        echo json_encode(['success' => false, 'message' => 'Skor kaydedilemedi']);
     }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Veritabanı hatası']);
