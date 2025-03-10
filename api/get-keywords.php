@@ -12,7 +12,7 @@ $keywords = [
     "yaşamak", "okumak", "başlamak", "beklemek", "girmek", "geçmek", "kazanmak", "koymak",
     "getirmek", "açmak", "tutmak", "hissetmek", "yürümek", "düşmek", "kullanmak", "öğrenmek",
     "dinlemek", "yazmak", "satmak", "bitirmek", "uyumak", "izlemek", "oynamak", "koşmak",
-    "geliştirmek", "paylaşmak", "düzenlemek", "taşımak", "yardım etmek", "unutmak", "hatırlamak", "anlatmak",
+    "geliştirmek", "paylaşmak", "düzenlemek", "taşımak", "yardım", "unutmak", "hatırlamak", "anlatmak",
     
     // Temel isimler
     "insan", "şey", "zaman", "gün", "adam", "çocuk", "yıl", "iş", 

@@ -373,6 +373,27 @@ function loadTurkishWords() {
     });
 }
 
+// Puanı hesapla ve seviyeyi belirle
+function calculateScore(correctWords, totalKeystrokes, accuracy) {
+    // Temel puanı hesapla
+    let finalScore = Math.round((correctWords * 10) + (totalKeystrokes * 0.2));
+    
+    // Doğruluk oranına göre puanı ayarla
+    finalScore = Math.round(finalScore * (accuracy / 100));
+    
+    // Seviyeyi belirle
+    let skillLevel = "Başlangıç";
+    if (finalScore >= 1000) skillLevel = "Uzman";
+    else if (finalScore >= 800) skillLevel = "İleri";
+    else if (finalScore >= 500) skillLevel = "Orta";
+    else if (finalScore >= 300) skillLevel = "Acemi";
+    
+    return {
+        score: finalScore,
+        skillLevel: skillLevel
+    };
+}
+
 // Oyunu başlat
 function startGame() {
     // Değişkenleri sıfırla
@@ -423,27 +444,19 @@ function endGame() {
     const totalWords = correctWords + incorrectWords;
     const accuracy = totalWords > 0 ? Math.round((correctWords / totalWords) * 100) : 0;
     
-    // Puanı hesapla
-    let finalScore = Math.round((correctWords * 10) + (totalKeystrokes * 0.2));
-    finalScore = Math.round(finalScore * (accuracy / 100)); // Doğruluk oranına göre puanı ayarla
-    
-    // Seviyeyi belirle
-    let skillLevel = "Başlangıç";
-    if (finalScore >= 100) skillLevel = "Uzman";
-    else if (finalScore >= 80) skillLevel = "İleri";
-    else if (finalScore >= 50) skillLevel = "Orta";
-    else if (finalScore >= 30) skillLevel = "Acemi";
+    // Puanı ve seviyeyi hesapla
+    const result = calculateScore(correctWords, totalKeystrokes, accuracy);
     
     // Sonuçları güncelle
-    document.getElementById('final-score').textContent = finalScore;
+    document.getElementById('final-score').textContent = result.score;
     document.getElementById('correct-words').textContent = correctWords;
     document.getElementById('incorrect-words').textContent = incorrectWords;
     document.getElementById('accuracy').textContent = accuracy;
     document.getElementById('total-keystrokes').textContent = totalKeystrokes;
-    document.getElementById('skill-level').textContent = skillLevel;
+    document.getElementById('skill-level').textContent = result.skillLevel;
     
     // Kullanıcı adı değil, anlık skora göre sıralama bilgilerini getir
-    fetchUserRankings(finalScore, true);
+    fetchUserRankings(result.score, true);
     
     // Yanlış yazılan kelimeleri göster
     displayIncorrectWords();
@@ -452,7 +465,7 @@ function endGame() {
     displayKeyErrorStats();
     
     // Kullanıcı adı yerine skor bilgisini API'ye gönder
-    const currentScore = finalScore;
+    const currentScore = result.score;
     const username = currentUsername;
     
     // Kullanıcı adı varsa, skor kaydetme bölümünü gizle
