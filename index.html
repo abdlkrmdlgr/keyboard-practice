@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10 Parmak Klavye Hız Testi</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>10 Parmak Klavye Hız Testi</h1>
+        
+        <div id="start-screen" class="start-screen">
+            <p>Başlamak için butona tıklayın. 1 dakika süreniz olacak.</p>
+            <button id="start-btn" class="start-btn">Başla</button>
+        </div>
+        
+        <div id="game-screen" style="display: none;">
+            <div id="timer" class="timer">01:00</div>
+            <div id="word-display" class="word-display"></div>
+            <div class="input-area">
+                <input type="text" id="word-input" placeholder="Kelimeyi yazın ve boşluk tuşuna basın" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+            <button id="end-game-btn" class="end-game-btn">Oyunu Bitir</button>
+        </div>
+        
+        <div id="result" class="result">
+            <h2>Sonuçlar</h2>
+            <div class="score-box">
+                <div class="final-score">
+                    <h3>Toplam Puanınız</h3>
+                    <div class="score-value"><span id="final-score">0</span></div>
+                    <div class="skill-level">Seviye: <span id="skill-level">Başlangıç</span></div>
+                </div>
+            </div>
+            
+            <div class="stats-container">
+                <p>Doğru Kelimeler: <span id="correct-words">0</span></p>
+                <p>Yanlış Kelimeler: <span id="incorrect-words">0</span></p>
+                <p>Doğruluk Oranı: <span id="accuracy">0</span>%</p>
+                <p>Toplam Tuş Vuruşu: <span id="total-keystrokes">0</span></p>
+            </div>
+            
+            <!-- Skor Kaydetme Bölümü -->
+            <div class="save-score-section">
+                <h3>Skorunuzu Kaydedin</h3>
+                <div class="score-input-row">
+                    <div class="input-container">
+                        <input type="text" id="username-input" placeholder="Kullanıcı adınızı girin" required>
+                    </div>
+                    <button id="save-score-btn" class="save-btn">Skoru Kaydet</button>
+                </div>
+                <p id="save-message" style="display: none;"></p>
+            </div>
+            
+            <h3>Yanlış Yazılan Kelimeler</h3>
+            <div id="incorrect-words-list"></div>
+            
+            <h3>En Sık Yapılan Tuş Hataları</h3>
+            <p class="error-info">Bu tablo, yazım sırasında hangi harflerde hata yaptığınızı gösterir. "Fazladan Yazılan" satırları gereksiz yazılan harfleri, "Yazılmamış" ifadesi ise eksik bırakılan harfleri belirtir.</p>
+            <div id="key-error-stats"></div>
+            
+            <button id="restart-btn" class="restart-btn">Tekrar Başla</button>
+        </div>
+
+        <!-- Skor Tablosu Bölümü -->
+        <div id="scoreboard-container" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
+            <h2>Skor Tablosu</h2>
+            
+            <!-- Tab yapısındaki butonlar -->
+            <div class="scoreboard-tabs">
+                <div class="tab-button active" id="hourly-tab">Saatlik</div>
+                <div class="tab-button" id="daily-tab">Günlük</div>
+                <div class="tab-button" id="weekly-tab">Haftalık</div>
+            </div>
+            
+            <div id="scoreboard-display">
+                <table id="scoreboard-table">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Kullanıcı</th>
+                            <th>Puan</th>
+                            <th>Kelime Sayısı</th>
+                            <th>Vuruş Sayısı</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scoreboard-body">
+                        <!-- Skorlar burada gösterilecek -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
