@@ -753,9 +753,12 @@ function saveUserScore() {
     let username = currentUsername;
     const saveMessage = document.getElementById('save-message');
     
-    // Score ve tuş vuruş sayısını al
+    // Score, tuş vuruş sayısı ve doğruluk oranını al
     const score = parseInt(document.getElementById('final-score').textContent) || 0;
     const keystrokeCount = parseInt(document.getElementById('total-keystrokes').textContent) || 0;
+    const correctWords = parseInt(document.getElementById('correct-words').textContent) || 0;
+    const incorrectWords = parseInt(document.getElementById('incorrect-words').textContent) || 0;
+    const accuracy = parseInt(document.getElementById('accuracy').textContent) || 0;
     
     // Score ve tuş vuruş sayısı kontrolü
     if (score <= 0 || keystrokeCount <= 0) {
@@ -788,15 +791,14 @@ function saveUserScore() {
         usernameInput.value = username;
     }
     
-    // Kullanıcının son skorunu al
-    const wordCount = parseInt(document.getElementById('correct-words').textContent) || 0;
-    
     // Skoru kaydet
     const scoreData = {
         username: username,
         score: score,
-        wordCount: wordCount,
+        wordCount: correctWords,
+        incorrectWords: incorrectWords,
         keystrokeCount: keystrokeCount,
+        accuracy: accuracy,
         timestamp: Date.now()
     };
     
@@ -837,8 +839,7 @@ function saveUserScore() {
             // Kullanıcı sıralama bilgilerini güncelle
             fetchUserRankings(score);
         } else {
-            // Hata mesajı göster
-            saveMessage.textContent = 'Skor kaydedilirken bir hata oluştu: ' + data.message;
+            saveMessage.textContent = data.message || 'Skor kaydedilirken bir hata oluştu';
             saveMessage.style.color = '#f5222d';
         }
         saveMessage.style.display = 'block';
