@@ -176,7 +176,7 @@ function fetchUserRankings(usernameOrScore, isScore = false) {
     }
     
     // API endpoint'i ve parametreleri belirle
-    let apiUrl = `http://127.0.0.1:8080/get-user-rankings.php?score=${encodeURIComponent(usernameOrScore)}`;
+    let apiUrl = `/api/get-user-rankings.php?score=${encodeURIComponent(usernameOrScore)}`;
     
     // Sunucudan sıralama bilgilerini al
     fetch(apiUrl)
@@ -256,7 +256,7 @@ function moveRestartButton() {
 
 // API yüklemek için fonksiyonu güncelle
 function loadTurkishWords() {
-    return fetch('http://127.0.0.1:8080/get-keywords.php')
+    return fetch('/api/get-keywords.php')
         .then(response => response.json())
         .then(data => {
             turkishWords = data;
@@ -639,7 +639,7 @@ function saveUserScore() {
     localStorage.setItem('scoreboard', JSON.stringify(scores));
     
     // PHP endpoint'e gönder
-    fetch('http://127.0.0.1:8080/save-score.php', {
+    fetch('/api/save-score.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -683,7 +683,7 @@ function saveUserScore() {
 // Skorları sunucudan alma fonksiyonu
 function fetchScoresFromServer(timeFrame) {
     // api/ dizini olmadan tam URL kullan
-    fetch(`http://127.0.0.1:8080/get-scores.php?timeFrame=${timeFrame}`)
+    fetch(`/api/get-scores.php?timeFrame=${timeFrame}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
